@@ -1,7 +1,6 @@
-from pysocketio.client.events import on
 from pysocketio.client.socket import Socket
 
-from pyemitter import Emitter
+from pyemitter import Emitter, on
 import pyengineio as eio
 import logging
 

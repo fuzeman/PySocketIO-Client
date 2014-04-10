@@ -1,6 +1,4 @@
-from pysocketio.client.events import on
-
-from pyemitter import Emitter
+from pyemitter import Emitter, on
 import logging
 
 log = logging.getLogger(__name__)
