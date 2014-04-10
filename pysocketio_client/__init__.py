@@ -1,5 +1,5 @@
-from pysocketio.client.url import parse_url
-from pysocketio.client.manager import Manager
+from pysocketio_client.url import parse_url
+from pysocketio_client.manager import Manager
 
 import logging
 

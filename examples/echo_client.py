@@ -1,4 +1,4 @@
-import pysocketio.client as io
+import pysocketio_client as io
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
