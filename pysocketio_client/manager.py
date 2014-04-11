@@ -9,31 +9,40 @@ log = logging.getLogger(__name__)
 
 class Manager(Emitter):
     def __init__(self, uri, opts=None):
-        self.uri = uri
-        self.opts = opts or {}
+        """`Manager` constructor.
+
+        :param uri: engine uri
+        :type uri: str
+
+        :param opts: options
+        :type opts: dict
+        """
+        if opts is None:
+            opts = {}
+
+        opts['path'] = opts.get('path') or '/socket.io'
 
         self.nsps = {}
         self.subs = []
+        self.opts = opts
+
+        self.ready_state = 'closed'
+        self.uri = uri
 
         self.engine = None
-        self.ready_state = 'closed'
-
         self._timeout = None
 
-    def socket(self, nsp):
-        socket = self.nsps.get(nsp)
+    def maybe_reconnect(self):
+        """Starts trying to reconnect if reconnection is enabled and we have not
+           started reconnecting yet"""
+        pass
 
-        if not socket:
-            socket = Socket(self, nsp)
-            self.nsps[nsp] = socket
-            #var self = this;
-            #socket.on('connect', function(){
-            #    self.connected++;
-            #});
+    def open(self, func=None):
+        """Sets the current transport `socket`.
 
-        return socket
-
-    def open(self, fn=None):
+        :param func: callback
+        :type func: function
+        """
         log.debug('readyState %s', self.ready_state)
 
         if self.ready_state.startswith('open'):
@@ -50,8 +59,8 @@ class Manager(Emitter):
             self.on_open()
 
             # Trigger callback
-            if fn:
-                fn()
+            if func:
+                func()
 
         # emit 'connect_error'
         @on(socket, 'error')
@@ -61,8 +70,8 @@ class Manager(Emitter):
             self.ready_state = 'closed'
             self.emit('connect_error', data)
 
-            if fn:
-                fn(Exception('Connection error', data))
+            if func:
+                func(Exception('Connection error', data))
 
             self.maybe_reconnect()
 
@@ -92,6 +101,7 @@ class Manager(Emitter):
         return self
 
     def on_open(self):
+        """Called upon transport open."""
         log.debug('open')
 
         # clear old subs
@@ -104,24 +114,75 @@ class Manager(Emitter):
         # add new subs
         socket = self.engine
         self.subs.append(on(socket, 'data', self.on_data))
-        self.subs.append(on(socket, 'decoded', self.on_decoded()))
+        self.subs.append(on(socket, 'decoded', self.on_decoded))
         self.subs.append(on(socket, 'error', self.on_error))
         self.subs.append(on(socket, 'close', self.on_close))
 
+    def on_data(self, data):
+        """Called with data."""
+        pass
+
+    def on_decoded(self, packet):
+        """Called when parser fully decodes a packet."""
+        pass
+
+    def on_error(self, err):
+        """Called upon socket error."""
+        pass
+
+    def socket(self, nsp):
+        """Creates a new socket for the given `nsp`.
+
+        :rtype: Socket
+        """
+        socket = self.nsps.get(nsp)
+
+        if not socket:
+            socket = Socket(self, nsp)
+            self.nsps[nsp] = socket
+            #var self = this;
+            #socket.on('connect', function(){
+            #    self.connected++;
+            #});
+
+        return socket
+
+    def destroy(self, socket):
+        """Called upon a socket close.
+
+        :param socket: Socket to destroy
+        :type socket: Socket
+        """
+        pass
+
+    def packet(self, packet):
+        """Writes a packet.
+
+        :param packet: packet
+        :type packet: dict
+        """
+        pass
+
+    def process_packet_queue(self):
+        """If packet buffer is non-empty, begins encoding the
+           next packet in line."""
+        pass
+
     def cleanup(self):
+        """Clean up transport subscriptions and packet buffer."""
         pass
 
-    def maybe_reconnect(self):
+    def close(self):
+        """Close the current socket."""
         pass
 
-    def on_data(self):
+    def on_close(self, reason):
+        """Called upon engine close."""
+
+    def reconnect(self):
+        """Attempt a reconnection."""
         pass
 
-    def on_decoded(self):
-        pass
-
-    def on_error(self):
-        pass
-
-    def on_close(self):
+    def on_reconnect(self):
+        """Called upon successful reconnect."""
         pass

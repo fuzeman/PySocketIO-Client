@@ -9,7 +9,7 @@ def get_components(url):
         'protocol': parsed.scheme,
         'host': parsed.hostname,
         'port': parsed.port,
-        'path': parsed.path
+        'path': parsed.path or '/'
     }
 
 

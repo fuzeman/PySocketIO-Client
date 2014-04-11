@@ -42,7 +42,7 @@ class Socket(Emitter):
         log.debug('transport is open - connecting')
 
         # write connect packet if necessary
-        if '/' != self.nsp:
+        if self.nsp != '/':
             self.packet({type: parser.CONNECT})
 
     def send(self, *args):
