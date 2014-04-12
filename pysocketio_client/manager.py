@@ -1,7 +1,7 @@
-from pysocketio_client.socket import Socket
-
 from pyemitter import Emitter, on
+from pysocketio_client.socket import Socket
 import pyengineio_client as eio
+import pysocketio_parser as parser
 import logging
 
 log = logging.getLogger(__name__)
@@ -29,13 +29,21 @@ class Manager(Emitter):
         self.ready_state = 'closed'
         self.uri = uri
 
+        self.encoding = False
+        self.packet_buffer = []
+
+        self.encoder = parser.Encoder()
+        self.decoder = parser.Decoder()
+
         self.engine = None
         self._timeout = None
+
+        self.open()
 
     def maybe_reconnect(self):
         """Starts trying to reconnect if reconnection is enabled and we have not
            started reconnecting yet"""
-        pass
+        raise NotImplementedError()
 
     def open(self, func=None):
         """Sets the current transport `socket`.
@@ -114,21 +122,22 @@ class Manager(Emitter):
         # add new subs
         socket = self.engine
         self.subs.append(on(socket, 'data', self.on_data))
-        self.subs.append(on(socket, 'decoded', self.on_decoded))
+        self.subs.append(on(self.decoder, 'decoded', self.on_decoded))
         self.subs.append(on(socket, 'error', self.on_error))
         self.subs.append(on(socket, 'close', self.on_close))
 
     def on_data(self, data):
         """Called with data."""
-        pass
+        self.decoder.add(data)
 
     def on_decoded(self, packet):
         """Called when parser fully decodes a packet."""
-        pass
+        self.emit('packet', packet)
 
     def on_error(self, err):
         """Called upon socket error."""
-        pass
+        log.debug('error %s', err)
+        self.emit('error', err)
 
     def socket(self, nsp):
         """Creates a new socket for the given `nsp`.
@@ -140,7 +149,7 @@ class Manager(Emitter):
         if not socket:
             socket = Socket(self, nsp)
             self.nsps[nsp] = socket
-            #var self = this;
+
             #socket.on('connect', function(){
             #    self.connected++;
             #});
@@ -153,7 +162,7 @@ class Manager(Emitter):
         :param socket: Socket to destroy
         :type socket: Socket
         """
-        pass
+        raise NotImplementedError()
 
     def packet(self, packet):
         """Writes a packet.
@@ -161,28 +170,36 @@ class Manager(Emitter):
         :param packet: packet
         :type packet: dict
         """
-        pass
+        log.debug('writing packet %s', packet)
+
+        raise NotImplementedError()
 
     def process_packet_queue(self):
         """If packet buffer is non-empty, begins encoding the
            next packet in line."""
-        pass
+        raise NotImplementedError()
 
     def cleanup(self):
         """Clean up transport subscriptions and packet buffer."""
-        pass
+        # TODO unbind `subs`
+
+        self.encoding = False
+        self.packet_buffer = []
+
+        self.decoder.destroy()
 
     def close(self):
         """Close the current socket."""
-        pass
+        raise NotImplementedError()
 
     def on_close(self, reason):
         """Called upon engine close."""
+        raise NotImplementedError()
 
     def reconnect(self):
         """Attempt a reconnection."""
-        pass
+        raise NotImplementedError()
 
     def on_reconnect(self):
         """Called upon successful reconnect."""
-        pass
+        raise NotImplementedError()

@@ -8,6 +8,10 @@ socket = io.connect('http://localhost:8000')
 def connected():
     print "connected"
 
+@socket.on('news')
+def news(data):
+    print "NEWS - %s" % data
+
 
 while True:
     raw_input()
