@@ -1,5 +1,7 @@
 from pysocketio_client.util import has_binary, is_callable
+
 from pyemitter import Emitter, on
+from threading import Lock
 import pysocketio_parser as parser
 import logging
 
@@ -53,7 +55,7 @@ class Socket(Emitter):
 
     def send(self, *args):
         """Sends a `message` event."""
-        raise NotImplementedError()
+        self.emit('message', *args)
 
     def emit(self, ev, *args):
         """Override `emit`.
@@ -93,7 +95,7 @@ class Socket(Emitter):
 
     def on_error(self, data):
         """Called upon `error`."""
-        raise NotImplementedError()
+        self.emit('error', data)
 
     def on_open(self):
         """"Opens" the socket."""
@@ -151,13 +153,35 @@ class Socket(Emitter):
         else:
             self.buffer.append(args)
 
-    def ack(self, id):
+    def ack(self, ack_id):
         """Produces an ack callback to emit with an event."""
-        raise NotImplementedError()
+        lock = Lock()
+
+        def func(*args):
+            if not lock.acquire(blocking=False):
+                return
+
+            log.debug('sending ack %s', args)
+
+            self.packet({
+                'type': parser.ACK,
+                'id': ack_id,
+                'data': args
+            })
+
+        return func
 
     def on_ack(self, packet):
         """Called upon a server acknowlegement."""
-        raise NotImplementedError()
+        log.debug('calling ack %s with %s', packet.get('id'), packet.get('data'))
+
+        fn = self.acks.get(packet.get('id'))
+        if not fn:
+            return
+
+        fn(*packet.get('data', []))
+
+        del self.acks[packet['id']]
 
     def on_connect(self):
         """Called upon server connect."""
@@ -176,15 +200,30 @@ class Socket(Emitter):
 
     def on_disconnect(self):
         """Called upon server disconnect."""
-        raise NotImplementedError()
+        log.debug('server disconnect (%s)', self.nsp)
+        self.destroy()
+        self.on_close('io server disconnect')
 
     def destroy(self):
         """Called upon forced client/server side disconnections,
            this method ensures the manager stops tracking us and
            that reconnections don't get triggered for this.
         """
-        raise NotImplementedError()
+        # TODO unbind subs
+
+        self.io.destroy(self)
 
     def close(self):
         """Disconnects the socket manually."""
-        raise NotImplementedError()
+        if not self.connected:
+            return self
+
+        log.debug('performing disconnect (%s)', self.nsp)
+        self.packet({'type': parser.DISCONNECT})
+
+        # remove socket from pool
+        self.destroy()
+
+        # fire vents
+        self.on_close('io client disconnect')
+        return self

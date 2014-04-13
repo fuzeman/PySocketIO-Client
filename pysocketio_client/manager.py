@@ -1,5 +1,7 @@
-from pyemitter import Emitter, on
+from pysocketio_client.util import delayed_call, delayed_cancel
 from pysocketio_client.socket import Socket
+
+from pyemitter import Emitter, on
 import pyengineio_client as eio
 import pysocketio_parser as parser
 import logging
@@ -28,6 +30,7 @@ class Manager(Emitter):
 
         self.ready_state = 'closed'
         self.uri = uri
+        self.connected = 0
 
         self.encoding = False
         self.packet_buffer = []
@@ -36,14 +39,92 @@ class Manager(Emitter):
         self.decoder = parser.Decoder()
 
         self.engine = None
-        self._timeout = None
+
+        self._reconnection = opts.get('reconnection', True)
+        self._reconnection_attempts = opts.get('reconnection_attempts')
+        self._reconnection_delay = opts.get('reconnection_delay', 1000)
+        self._reconnection_delay_max = opts.get('reconnection_delay_max', 5000)
+
+        self._timeout = opts.get('timeout', 20000)
+
+        self.open_reconnect = False
+        self.reconnecting = False
+        self.attempts = 0
 
         self.open()
+
+    @property
+    def reconnection(self):
+        return self._reconnection
+
+    @reconnection.setter
+    def reconnection(self, value):
+        """Sets the `reconnection` config.
+
+        :param value: True if we should automatically reconnect
+        :type value: bool
+        """
+        self._reconnection = value
+
+    @property
+    def reconnection_attempts(self):
+        return self._reconnection_attempts
+
+    @reconnection_attempts.setter
+    def reconnection_attempts(self, value):
+        """Sets the reconnection attempts config.
+
+        :param value: max reconnection attempts before giving up
+        :type value: int
+        """
+        self._reconnection_attempts = value
+
+    @property
+    def reconnection_delay(self):
+        return self._reconnection_delay
+
+    @reconnection_delay.setter
+    def reconnection_delay(self, value):
+        """Sets the delay between reconnections.
+
+        :param value: delay (in milliseconds)
+        :type value: int
+        """
+        self._reconnection_delay = value
+
+    @property
+    def reconnection_delay_max(self):
+        return self._reconnection_delay_max
+
+    @reconnection_delay_max.setter
+    def reconnection_delay_max(self, value):
+        """Sets the maximum delay between reconnections.
+
+        :param value: max delay (in milliseconds)
+        :type value: int
+        """
+        self._reconnection_delay_max = value
+
+    @property
+    def timeout(self):
+        return self._timeout
+
+    @timeout.setter
+    def timeout(self, value):
+        """Sets the connection timeout.
+
+        :param value: timeout (in milliseconds) or `False` to disable
+        :type value: int or False
+        """
+        self._timeout = value
 
     def maybe_reconnect(self):
         """Starts trying to reconnect if reconnection is enabled and we have not
            started reconnecting yet"""
-        raise NotImplementedError()
+
+        if not self.open_reconnect and not self.reconnecting and self.reconnection:
+            self.open_reconnect = True
+            self.reconnect()
 
     def open(self, func=None):
         """Sets the current transport `socket`.
@@ -150,9 +231,9 @@ class Manager(Emitter):
             socket = Socket(self, nsp)
             self.nsps[nsp] = socket
 
-            #socket.on('connect', function(){
-            #    self.connected++;
-            #});
+            @socket.on('connect')
+            def socket_connected():
+                self.connected += 1
 
         return socket
 
@@ -162,7 +243,10 @@ class Manager(Emitter):
         :param socket: Socket to destroy
         :type socket: Socket
         """
-        raise NotImplementedError()
+        self.connected -= 1
+
+        if not self.connected:
+            self.close()
 
     def packet(self, packet):
         """Writes a packet.
@@ -212,8 +296,51 @@ class Manager(Emitter):
 
     def reconnect(self):
         """Attempt a reconnection."""
-        raise NotImplementedError()
+        if self.reconnecting:
+            return self
+
+        attempts_max = self.reconnection_attempts
+
+        self.attempts += 1
+
+        if attempts_max is not None and self.attempts > attempts_max:
+            log.debug('reconnection failed')
+            self.emit('reconnect_failed')
+            self.reconnecting = False
+        else:
+            delay = self.attempts * self.reconnection_delay
+            delay = min(delay, self.reconnection_delay_max)
+            delay = float(delay) / 1000
+
+            log.debug('will wait %ss before reconnection attempt', delay)
+            self.reconnecting = True
+
+            @delayed_call(delay)
+            def attempt():
+                log.debug('attempting reconnect')
+                self.emit('reconnect_attempt')
+
+                def open_callback(exc=None):
+                    if exc:
+                        log.debug('reconnect attempt error')
+                        self.reconnecting = False
+                        self.reconnect()
+                        self.emit('reconnect_error', exc)
+                    else:
+                        log.debug('reconnect success')
+                        self.on_reconnect()
+
+                self.open(open_callback)
+
+            self.subs.append({
+                'destroy': lambda: delayed_cancel(attempt)
+            })
 
     def on_reconnect(self):
         """Called upon successful reconnect."""
-        raise NotImplementedError()
+        attempt = self.attempts
+
+        self.attempts = 0
+        self.reconnecting = False
+
+        self.emit('reconnect', attempt)
