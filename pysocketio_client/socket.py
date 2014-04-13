@@ -66,7 +66,7 @@ class Socket(Emitter):
             super(Socket, self).emit(ev, *args)
             return self
 
-        args = list(args)
+        args = [ev] + list(args)
         parser_type = parser.EVENT  # default type
 
         if has_binary(args):
@@ -85,9 +85,6 @@ class Socket(Emitter):
         self.packet(packet)
 
         return self
-
-
-        raise NotImplementedError()
 
     def packet(self, packet):
         """Sends a packet."""

@@ -172,12 +172,26 @@ class Manager(Emitter):
         """
         log.debug('writing packet %s', packet)
 
-        raise NotImplementedError()
+        if not self.encoding:
+            self.encoding = True
+
+            def encoded(packets):
+                for p in packets:
+                    self.engine.write(p)
+
+                self.encoding = False
+                self.process_packet_queue()
+
+            self.encoder.encode(packet, encoded)
+        else:
+            self.packet_buffer.append(packet)
 
     def process_packet_queue(self):
         """If packet buffer is non-empty, begins encoding the
            next packet in line."""
-        raise NotImplementedError()
+        if self.packet_buffer and not self.encoding:
+            pack = self.packet_buffer.pop(0)
+            self.packet(pack)
 
     def cleanup(self):
         """Clean up transport subscriptions and packet buffer."""

@@ -2,6 +2,7 @@
     "name": "pysocketio-examples",
     "version": "0.0.1",
     "dependencies": {
-        "socket.io": "latest"
+        "socket.io": "1.0.0-pre",
+        "socket.io-client": "1.0.0-pre"
     }
 }
