@@ -288,11 +288,19 @@ class Manager(Emitter):
 
     def close(self):
         """Close the current socket."""
-        raise NotImplementedError()
+        self.skip_reconnect = True
+        self.engine.close()
 
     def on_close(self, reason):
         """Called upon engine close."""
-        raise NotImplementedError()
+        log.debug('close')
+
+        self.cleanup()
+        self.ready_state = 'closed'
+        self.emit('close', reason)
+
+        if self.reconnection and not self.skip_reconnect:
+            self.reconnect()
 
     def reconnect(self):
         """Attempt a reconnection."""
