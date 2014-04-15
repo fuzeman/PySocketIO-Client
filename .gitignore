@@ -1,3 +1,5 @@
 node_modules/
 
 *.pyc
+
+/PySocketIO_Client.egg-info
