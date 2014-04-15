@@ -144,7 +144,6 @@ class Manager(Emitter):
         self.ready_state = 'opening'
 
         # emit 'open'
-        @on(socket, 'open')
         def open_sub():
             self.on_open()
 
@@ -152,8 +151,9 @@ class Manager(Emitter):
             if func:
                 func()
 
+        self.subs.append(on(socket, 'open', open_sub))
+
         # emit 'connect_error'
-        @on(socket, 'error')
         def error_sub(data):
             log.debug('connect_error')
             self.cleanup()
@@ -164,6 +164,8 @@ class Manager(Emitter):
                 func(Exception('Connection error', data))
 
             self.maybe_reconnect()
+
+        self.subs.append(on(socket, 'error', error_sub))
 
         # TODO emit 'connect_timeout'
         if self._timeout:
@@ -184,9 +186,6 @@ class Manager(Emitter):
             #        clearTimeout(timer);
             #    }
             #})
-
-        self.subs.append(open_sub)
-        self.subs.append(error_sub)
 
         return self
 
@@ -280,7 +279,13 @@ class Manager(Emitter):
 
     def cleanup(self):
         """Clean up transport subscriptions and packet buffer."""
-        # TODO unbind `subs`
+        for sub in self.subs:
+            if not sub.get('destroy'):
+                continue
+
+            sub['destroy']()
+
+        self.subs = []
 
         self.encoding = False
         self.packet_buffer = []

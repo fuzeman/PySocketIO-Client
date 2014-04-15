@@ -209,7 +209,11 @@ class Socket(Emitter):
            this method ensures the manager stops tracking us and
            that reconnections don't get triggered for this.
         """
-        # TODO unbind subs
+        for sub in self.subs:
+            if not sub.get('destroy'):
+                continue
+
+            sub['destroy']()
 
         self.io.destroy(self)
 
