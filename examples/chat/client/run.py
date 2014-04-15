@@ -1,7 +1,10 @@
 import pysocketio_client as io
 import logging
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig()
+
+logging.getLogger('pyengineio_client').setLevel(logging.DEBUG)
+logging.getLogger('pysocketio_client').setLevel(logging.DEBUG)
 
 username = raw_input('username: ')
 
