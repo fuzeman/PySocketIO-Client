@@ -47,6 +47,7 @@ class Manager(Emitter):
 
         self._timeout = opts.get('timeout', 20000)
 
+        self.skip_reconnect = False
         self.open_reconnect = False
         self.reconnecting = False
         self.attempts = 0
@@ -291,7 +292,7 @@ class Manager(Emitter):
         self.skip_reconnect = True
         self.engine.close()
 
-    def on_close(self, reason):
+    def on_close(self, reason, desc=None):
         """Called upon engine close."""
         log.debug('close')
 
